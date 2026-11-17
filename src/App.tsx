@@ -1,8 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   CITIES, NETWORK_STATS, TRACKING_STAGES, EMAIL, PHONE_DISPLAY, PHONE_SMS, PHONE_TEL,
-  SERVICES, SERVICE_OS_URL, SISTER_BRANDS, SPEEDY_APPLIANCES, SPEEDY_RULES,
+  SERVICES, SERVICE_OS_URL, SERVICE_OS_BOOK_URL, SERVICE_OS_SPEEDY_URL, SERVICE_OS_TRACK_URL,
+  SISTER_BRANDS, GUIDE_APPLIANCES, GUIDE_RULES,
 } from './data'
+import {
+  buildBookingPayload, captureAttribution, submitBooking, validateBookingForm,
+  type BookingResult,
+} from './booking'
 import { Icon, Logo } from './icons'
 
 type View =
@@ -21,7 +26,7 @@ const NAV: { kind: View['kind']; label: string }[] = [
   { kind: 'hub', label: 'Network Hub' },
   { kind: 'services', label: 'Services' },
   { kind: 'cities', label: 'City Pages' },
-  { kind: 'speedy', label: 'Speedy Guide' },
+  { kind: 'speedy', label: 'Speedy' },
   { kind: 'track', label: 'Track a Job' },
   { kind: 'hq', label: 'Network HQ' },
   { kind: 'about', label: 'About' },
@@ -180,7 +185,7 @@ function Hub({ go }: { go: (v: View) => void }) {
           <span className="kicker"><Icon name="route" size={14} /> How the network works</span>
           <h2 className="sec-title">One request path, from any page</h2>
           <div className="steps mt-lg">
-            <div className="step"><span className="num">1</span><h3>You send a request</h3><p>From the hub, a service page or your city page — by booking prep, call or text to {PHONE_DISPLAY}.</p></div>
+            <div className="step"><span className="num">1</span><h3>You send a request</h3><p>From the hub, a service page or your city page — with the booking form on this site, or by call or text to {PHONE_DISPLAY}.</p></div>
             <div className="step"><span className="num">2</span><h3>A setter confirms it</h3><p>Your request is submitted in Top Speed Service OS, where a human Service Setter reviews and confirms the job.</p></div>
             <div className="step"><span className="num">3</span><h3>A technician is dispatched</h3><p>Only confirmed jobs go out. The technician arrives knowing the appliance, the problem and the city.</p></div>
             <div className="step"><span className="num">4</span><h3>You track it in Service OS</h3><p>Job status lives in Service OS and the Appliance Connect portal — one record, start to finish.</p></div>
@@ -286,7 +291,7 @@ function ServiceDetail({ id, go }: { id: string; go: (v: View) => void }) {
         <div className="wrap">
           <div className="notice notice-warn mt-lg">
             <Icon name="speedy" size={20} />
-            <p><strong>Not sure it’s the {s.name.replace(' Repair', '').toLowerCase()}?</strong> Try the Speedy guide for likely causes and safety notes first — it’s a local guide that points you in the right direction, not a diagnosis. And remember: pricing is confirmed when you book through Service OS.</p>
+            <p><strong>Not sure it’s the {s.name.replace(' Repair', '').toLowerCase()}?</strong> Ask Speedy, the network’s AI assistant at Service OS, for a first look at likely causes and safety notes — a first look is not a diagnosis; only a technician inspecting the appliance can diagnose it. And remember: pricing is confirmed when you book through Service OS.</p>
           </div>
           <div className="mt" style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
             <button className="btn btn-navy" onClick={() => go({ kind: 'speedy' })}><Icon name="speedy" size={17} /> Ask Speedy first</button>
@@ -382,22 +387,11 @@ function CityPage({ id, go }: { id: string; go: (v: View) => void }) {
 
 /* ─── 4. Book ─────────────────────────────────────────────────── */
 
-interface Draft {
-  name: string
-  phone: string
-  city: string
-  service: string
-  appliance: string
-  problem: string
-  window: string
-  utm_source: string
-  utm_medium: string
-  utm_campaign: string
-  gclid: string
-  savedAt: string
-}
-
-const DRAFT_KEY = 'thar-booking-draft'
+type BookPhase =
+  | { kind: 'form' }
+  | { kind: 'sending' }
+  | { kind: 'done'; result: BookingResult }
+  | { kind: 'error'; message: string }
 
 function Book({ serviceId, cityId, go }: { serviceId?: string; cityId?: string; go: (v: View) => void }) {
   const svc = serviceById(serviceId)
@@ -405,110 +399,159 @@ function Book({ serviceId, cityId, go }: { serviceId?: string; cityId?: string; 
   const [form, setForm] = useState({
     name: '', phone: '',
     city: cty?.name ?? '',
+    zip: '',
     service: svc?.name ?? '',
     appliance: '', problem: '', window: 'First available',
   })
-  const [draft, setDraft] = useState<Draft | null>(null)
-
-  useEffect(() => {
-    try {
-      const raw = sessionStorage.getItem(DRAFT_KEY)
-      if (raw) setDraft(JSON.parse(raw) as Draft)
-    } catch { /* session storage unavailable */ }
-  }, [])
+  const [phase, setPhase] = useState<BookPhase>({ kind: 'form' })
 
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
     setForm((f) => ({ ...f, [k]: e.target.value }))
 
-  const saveDraft = (e: React.FormEvent) => {
+  const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    const params = new URLSearchParams(window.location.search)
-    const d: Draft = {
-      ...form,
-      utm_source: params.get('utm_source') ?? '',
-      utm_medium: params.get('utm_medium') ?? '',
-      utm_campaign: params.get('utm_campaign') ?? '',
-      gclid: params.get('gclid') ?? '',
-      savedAt: new Date().toLocaleString(),
+    if (phase.kind === 'sending') return
+    const problem = validateBookingForm(form)
+    if (problem) {
+      setPhase({ kind: 'error', message: problem })
+      return
     }
-    try { sessionStorage.setItem(DRAFT_KEY, JSON.stringify(d)) } catch { /* ignore */ }
-    setDraft(d)
+    const payload = buildBookingPayload(
+      form,
+      captureAttribution(window.location.search),
+      window.location.href.split('#')[0],
+    )
+    if (!payload) {
+      setPhase({ kind: 'error', message: 'Please check the form and try again.' })
+      return
+    }
+    setPhase({ kind: 'sending' })
+    try {
+      const result = await submitBooking(payload)
+      setPhase({ kind: 'done', result })
+    } catch (err) {
+      setPhase({
+        kind: 'error',
+        message: err instanceof Error ? err.message : 'Your request did not go through — nothing was submitted.',
+      })
+    }
   }
+
+  const result = phase.kind === 'done' ? phase.result : null
+  const outOfArea = result?.areaStatus === 'OUT_OF_AREA'
 
   return (
     <>
       <div className="page-hero">
         <div className="wrap">
           <h1>Book a repair</h1>
-          <p>Prepare your request here, then submit it where every network booking is submitted — Top Speed Service OS. A Service Setter confirms every job before a technician is dispatched.</p>
+          <p>Send your request right here — it goes straight into Top Speed Service OS, the system the Service Setters work from. A setter confirms every job before a technician is dispatched.</p>
         </div>
       </div>
       <section className="block">
         <div className="wrap split">
-          <form className="form-card" onSubmit={saveDraft}>
-            <h2 style={{ color: 'var(--navy)', fontSize: '1.2rem' }}>Booking prep form</h2>
-            <p style={{ color: 'var(--muted)', fontSize: '0.92rem', margin: '0.3rem 0 1.1rem' }}>
-              This form saves a <strong>local draft on this device only</strong>. It does not send anything — step 2 below is where the real request is submitted.
-            </p>
-            <div className="form-grid">
-              <label className="f">Your name<input required value={form.name} onChange={set('name')} placeholder="Full name" /></label>
-              <label className="f">Phone (call/text)<input required value={form.phone} onChange={set('phone')} placeholder="Best number for the setter" /></label>
-              <label className="f">City
-                <select required value={form.city} onChange={set('city')}>
-                  <option value="">Select your city…</option>
-                  {CITIES.map((c) => <option key={c.id} value={c.name}>{c.name}{c.core ? ' (core)' : ''}</option>)}
-                </select>
-              </label>
-              <label className="f">Service
-                <select required value={form.service} onChange={set('service')}>
-                  <option value="">Select a service…</option>
-                  {SERVICES.map((s) => <option key={s.id} value={s.name}>{s.name}</option>)}
-                </select>
-              </label>
-              <label className="f">Appliance (brand / model if known)<input value={form.appliance} onChange={set('appliance')} placeholder="e.g. Samsung French-door fridge" /></label>
-              <label className="f">Preferred window
-                <select value={form.window} onChange={set('window')}>
-                  <option>First available</option>
-                  <option>Morning</option>
-                  <option>Afternoon</option>
-                  <option>Evening</option>
-                </select>
-              </label>
-              <label className="f full">What’s the problem?<textarea required rows={4} value={form.problem} onChange={set('problem')} placeholder="Describe the symptom — noises, leaks, error codes, when it started…" /></label>
+          {result ? (
+            <div className="form-card">
+              <span className={`pill ${outOfArea ? 'pill-demo' : 'pill-live'}`}>{outOfArea ? 'Request saved' : 'Booking received'}</span>
+              <h2 style={{ color: 'var(--navy)', fontSize: '1.2rem', marginTop: '0.7rem' }}>
+                {outOfArea ? 'That address is outside our current service area' : 'Booking received — thank you'}
+              </h2>
+              {result.areaMessage ? (
+                <p style={{ color: 'var(--muted)', fontSize: '0.95rem', margin: '0.4rem 0 1rem' }}>{result.areaMessage}</p>
+              ) : (
+                <p style={{ color: 'var(--muted)', fontSize: '0.95rem', margin: '0.4rem 0 1rem' }}>
+                  Your {result.appliance} request in {result.city} is in the Service OS queue. A Service Setter will call
+                  the number you gave to confirm the job, the window and the pricing before dispatch — nothing is
+                  dispatched or charged from a web form alone.
+                </p>
+              )}
+              <p style={{ color: 'var(--muted)', fontSize: '0.9rem', margin: 0 }}>{outOfArea ? 'Your reference:' : 'Your booking reference:'}</p>
+              <p style={{ fontFamily: "'Manrope', sans-serif", fontWeight: 800, fontSize: '1.6rem', color: 'var(--navy)', margin: '0.2rem 0 1rem' }}>{result.referenceCode}</p>
+              <ul className="checklist">
+                <li><Icon name="check" size={16} /> <span>Keep the reference — with your phone number, it opens live tracking in Service OS.</span></li>
+                <li><Icon name="phone" size={16} /> <span>Watch for the setter’s call to confirm your {result.preferredWindow ? result.preferredWindow.toLowerCase() : 'preferred'} window.</span></li>
+              </ul>
+              <div className="mt" style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+                <a className="btn btn-orange" href={SERVICE_OS_TRACK_URL} target="_blank" rel="noreferrer"><Icon name="track" size={16} /> Track your job in Service OS</a>
+                <a className="btn btn-outline" href={PHONE_TEL}><Icon name="phone" size={16} /> {PHONE_DISPLAY}</a>
+                <button className="btn btn-outline" type="button" onClick={() => setPhase({ kind: 'form' })}>Book another repair</button>
+              </div>
             </div>
-            <button className="btn btn-navy mt" type="submit"><Icon name="check" size={17} /> Save my local draft</button>
-          </form>
+          ) : (
+            <form className="form-card" onSubmit={onSubmit}>
+              <h2 style={{ color: 'var(--navy)', fontSize: '1.2rem' }}>Booking form</h2>
+              <p style={{ color: 'var(--muted)', fontSize: '0.92rem', margin: '0.3rem 0 1.1rem' }}>
+                This form submits your real request to Top Speed Service OS. When it goes through, your booking
+                reference appears right here — that’s your proof it landed with the setters.
+              </p>
+              <div className="form-grid">
+                <label className="f">Your name<input required value={form.name} onChange={set('name')} placeholder="Full name" /></label>
+                <label className="f">Phone (call/text)<input required value={form.phone} onChange={set('phone')} placeholder="Best number for the setter" /></label>
+                <label className="f">City
+                  <select required value={form.city} onChange={set('city')}>
+                    <option value="">Select your city…</option>
+                    {CITIES.map((c) => <option key={c.id} value={c.name}>{c.name}{c.core ? ' (core)' : ''}</option>)}
+                  </select>
+                </label>
+                <label className="f">ZIP code<input required value={form.zip} onChange={set('zip')} placeholder="5-digit ZIP" inputMode="numeric" maxLength={5} /></label>
+                <label className="f">Service
+                  <select required value={form.service} onChange={set('service')}>
+                    <option value="">Select a service…</option>
+                    {SERVICES.map((s) => <option key={s.id} value={s.name}>{s.name}</option>)}
+                  </select>
+                </label>
+                <label className="f">Appliance (brand / model if known)<input value={form.appliance} onChange={set('appliance')} placeholder="e.g. Samsung French-door fridge" /></label>
+                <label className="f">Preferred window
+                  <select value={form.window} onChange={set('window')}>
+                    <option>First available</option>
+                    <option>Morning</option>
+                    <option>Afternoon</option>
+                    <option>Evening</option>
+                  </select>
+                </label>
+                <label className="f full">What’s the problem?<textarea required rows={4} value={form.problem} onChange={set('problem')} placeholder="Describe the symptom — noises, leaks, error codes, when it started…" /></label>
+              </div>
+              {phase.kind === 'error' && (
+                <div className="notice notice-warn mt">
+                  <Icon name="alert" size={20} />
+                  <p><strong>{phase.message}</strong> You can also book with Speedy below, or call or text {PHONE_DISPLAY} and a setter will book you in.</p>
+                </div>
+              )}
+              <button className="btn btn-orange mt" type="submit" disabled={phase.kind === 'sending'}>
+                <Icon name="calendar" size={17} /> {phase.kind === 'sending' ? 'Sending to Service OS…' : 'Submit my booking request'}
+              </button>
+            </form>
+          )}
 
           <div className="stack">
             <div className="card" style={{ cursor: 'default' }}>
               <h3>How booking actually works</h3>
               <ul className="checklist mt">
-                <li><Icon name="check" size={16} /> <span><strong>Step 1 — Prep here.</strong> Fill in the form and save the local draft. It stays in this browser.</span></li>
-                <li><Icon name="check" size={16} /> <span><strong>Step 2 — Submit in Service OS.</strong> Send the real request at topspeedserviceos.com — that’s the system the setters work from.</span></li>
-                <li><Icon name="check" size={16} /> <span><strong>Step 3 — A setter confirms.</strong> A human confirms the job, the window and the pricing before dispatch.</span></li>
+                <li><Icon name="check" size={16} /> <span><strong>Step 1 — Submit here.</strong> The form on this page sends your request straight into Top Speed Service OS — no hand-off, no second form.</span></li>
+                <li><Icon name="check" size={16} /> <span><strong>Step 2 — A setter confirms.</strong> A human Service Setter confirms the job, the window and the pricing before dispatch.</span></li>
+                <li><Icon name="check" size={16} /> <span><strong>Step 3 — Track it live.</strong> Follow the job in Service OS with your booking reference and the phone number on the booking.</span></li>
               </ul>
               <div className="mt" style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
-                <a className="btn btn-orange" href={SERVICE_OS_URL} target="_blank" rel="noreferrer">Submit at Service OS <Icon name="arrow" size={16} /></a>
                 <a className="btn btn-outline" href={PHONE_TEL}><Icon name="phone" size={16} /> {PHONE_DISPLAY}</a>
+                <button className="btn btn-outline" type="button" onClick={() => go({ kind: 'track' })}><Icon name="track" size={16} /> Track a job</button>
+              </div>
+            </div>
+            <div className="card" style={{ cursor: 'default' }}>
+              <h3 style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}><Icon name="speedy" size={20} /> Prefer the high-tech route?</h3>
+              <p style={{ marginTop: '0.4rem' }}>
+                Book with <strong>Speedy AI</strong> instead: chat with Speedy, send a photo of the problem for a first
+                look, and Speedy shows you a summary to confirm before anything is sent to the setters. Same queue,
+                same human confirmation.
+              </p>
+              <div className="mt" style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+                <a className="btn btn-navy btn-sm" href={SERVICE_OS_BOOK_URL} target="_blank" rel="noreferrer"><Icon name="speedy" size={16} /> Book with Speedy AI</a>
+                <a className="btn btn-outline btn-sm" href={SERVICE_OS_SPEEDY_URL} target="_blank" rel="noreferrer"><Icon name="chat" size={16} /> Talk to Speedy</a>
               </div>
             </div>
             <div className="notice notice-info">
               <Icon name="shield" size={20} />
               <p><strong>No prices on this site — on purpose.</strong> Pricing is confirmed when you book through Service OS, before any work begins.</p>
             </div>
-            {draft && (
-              <div className="card" style={{ cursor: 'default' }}>
-                <span className="draft-stamp">LOCAL DRAFT ONLY — NOT SUBMITTED</span>
-                <p style={{ margin: '0.7rem 0', color: 'var(--muted)', fontSize: '0.9rem' }}>
-                  Saved {draft.savedAt} in this browser only. Nothing was sent to dispatch. Take these details to Service OS, or read them out when you call.
-                </p>
-                <pre className="draft">{JSON.stringify(draft, null, 2)}</pre>
-                <div className="mt" style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
-                  <a className="btn btn-orange btn-sm" href={SERVICE_OS_URL} target="_blank" rel="noreferrer">Submit it at Service OS</a>
-                  <a className="btn btn-outline btn-sm" href={PHONE_SMS}>Text it instead</a>
-                </div>
-              </div>
-            )}
           </div>
         </div>
       </section>
@@ -519,32 +562,61 @@ function Book({ serviceId, cityId, go }: { serviceId?: string; cityId?: string; 
 /* ─── 5. Speedy ───────────────────────────────────────────────── */
 
 function Speedy({ go }: { go: (v: View) => void }) {
-  const [appliance, setAppliance] = useState(SPEEDY_APPLIANCES[0])
-  const symptoms = useMemo(() => SPEEDY_RULES.filter((r) => r.appliance === appliance), [appliance])
+  const [appliance, setAppliance] = useState(GUIDE_APPLIANCES[0])
+  const symptoms = useMemo(() => GUIDE_RULES.filter((r) => r.appliance === appliance), [appliance])
   const [symptom, setSymptom] = useState(symptoms[0]?.symptom ?? '')
-  const rule = SPEEDY_RULES.find((r) => r.appliance === appliance && r.symptom === symptom) ?? symptoms[0]
+  const rule = GUIDE_RULES.find((r) => r.appliance === appliance && r.symptom === symptom) ?? symptoms[0]
 
   return (
     <>
       <div className="page-hero">
         <div className="wrap">
-          <span className="pill pill-demo">Local rule-based guide</span>
-          <h1 style={{ marginTop: '0.7rem' }}>Speedy — the network guide</h1>
-          <p>Pick an appliance and a symptom. Speedy matches it against a small set of built-in rules and shows likely causes, safety warnings and prep steps — then hands you off to book a real technician.</p>
+          <span className="pill pill-live">The real Speedy — live at Service OS</span>
+          <h1 style={{ marginTop: '0.7rem' }}>Speedy — the network’s AI assistant</h1>
+          <p>Speedy is Top Speed’s real AI assistant, and it lives in Top Speed Service OS. Chat with Speedy, send a photo of the problem for a first look, and book in the conversation — every Speedy booking lands in the same Service Setter queue as the form on this site.</p>
+          <div className="hero-ctas" style={{ marginTop: '1.3rem' }}>
+            <a className="btn btn-orange" href={SERVICE_OS_SPEEDY_URL} target="_blank" rel="noreferrer"><Icon name="speedy" size={18} /> Talk to Speedy</a>
+            <a className="btn btn-ghost" href={SERVICE_OS_BOOK_URL} target="_blank" rel="noreferrer"><Icon name="calendar" size={18} /> Book with Speedy AI</a>
+            <button className="btn btn-ghost" onClick={() => go({ kind: 'book' })}><Icon name="calendar" size={18} /> Use the booking form</button>
+          </div>
         </div>
       </div>
       <section className="block">
         <div className="wrap">
-          <div className="notice notice-warn">
-            <Icon name="alert" size={20} />
-            <p><strong>Honest labels, up front:</strong> Speedy here is a <strong>local rule-based guide</strong> running entirely in your browser. It is <strong>not a live AI</strong>, it is <strong>not connected</strong> to Service OS, and its answers are <strong>possibilities, not a professional diagnosis</strong>. Only a technician inspecting the appliance can diagnose it.</p>
+          <div className="grid grid-3">
+            <div className="card" style={{ cursor: 'default' }}>
+              <span className="ic"><Icon name="chat" size={24} /></span>
+              <h3>Talk to Speedy</h3>
+              <p>Ask about symptoms, services, cities and what happens next. Speedy answers from the network’s real knowledge — and always keeps the book-or-call path one tap away.</p>
+              <a className="go" href={SERVICE_OS_SPEEDY_URL} target="_blank" rel="noreferrer" style={{ textDecoration: 'none' }}>Open Speedy chat <Icon name="arrow" size={15} /></a>
+            </div>
+            <div className="card" style={{ cursor: 'default' }}>
+              <span className="ic"><Icon name="speedy" size={24} /></span>
+              <h3>Photo first look</h3>
+              <p>Send Speedy a photo of the appliance or its model plate and get a structured first look at the problem — what it might be, and what a technician would check.</p>
+              <a className="go" href={SERVICE_OS_SPEEDY_URL} target="_blank" rel="noreferrer" style={{ textDecoration: 'none' }}>Send a photo to Speedy <Icon name="arrow" size={15} /></a>
+            </div>
+            <div className="card" style={{ cursor: 'default' }}>
+              <span className="ic"><Icon name="calendar" size={24} /></span>
+              <h3>Book with Speedy AI</h3>
+              <p>Speedy collects the details in conversation, shows you a summary, and sends the booking to the Service Setters only when you confirm it. A human still confirms every job.</p>
+              <a className="go" href={SERVICE_OS_BOOK_URL} target="_blank" rel="noreferrer" style={{ textDecoration: 'none' }}>Book with Speedy <Icon name="arrow" size={15} /></a>
+            </div>
           </div>
+
+          <div className="notice notice-info mt-lg">
+            <Icon name="shield" size={20} />
+            <p><strong>Honest labels, up front:</strong> Speedy gives a <strong>first look, not a professional diagnosis</strong> — only a technician inspecting the appliance can diagnose it. Speedy never certifies a repair as safe and never issues refunds; those stay with humans, by design.</p>
+          </div>
+
+          <h2 className="sec-title mt-lg" style={{ fontSize: '1.35rem' }}>Symptom guide — written reference</h2>
+          <p className="sec-sub">Prefer to read first? This is the network’s written symptom guide — plain reference content maintained by the network, not an AI. Pick an appliance and a symptom for likely causes, safety warnings and prep steps.</p>
 
           <div className="form-card mt-lg">
             <div className="form-grid">
               <label className="f">Appliance
-                <select value={appliance} onChange={(e) => { setAppliance(e.target.value); const s = SPEEDY_RULES.find((r) => r.appliance === e.target.value); setSymptom(s?.symptom ?? '') }}>
-                  {SPEEDY_APPLIANCES.map((a) => <option key={a} value={a}>{a}</option>)}
+                <select value={appliance} onChange={(e) => { setAppliance(e.target.value); const s = GUIDE_RULES.find((r) => r.appliance === e.target.value); setSymptom(s?.symptom ?? '') }}>
+                  {GUIDE_APPLIANCES.map((a) => <option key={a} value={a}>{a}</option>)}
                 </select>
               </label>
               <label className="f">Symptom
@@ -558,7 +630,7 @@ function Speedy({ go }: { go: (v: View) => void }) {
           {rule && (
             <div className="split mt-lg">
               <div className="card" style={{ cursor: 'default' }}>
-                <h3 style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}><Icon name="speedy" size={20} /> Likely causes — possibilities only</h3>
+                <h3 style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}><Icon name="wrench" size={20} /> Likely causes — possibilities only</h3>
                 <ul className="prob-list mt">
                   {rule.causes.map((c) => <li key={c}><Icon name="arrow" size={16} /> {c}</li>)}
                 </ul>
@@ -576,8 +648,9 @@ function Speedy({ go }: { go: (v: View) => void }) {
                   <ul className="checklist mt">
                     {rule.prep.map((p) => <li key={p}><Icon name="check" size={16} /> {p}</li>)}
                   </ul>
-                  <div className="mt">
+                  <div className="mt" style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
                     <button className="btn btn-orange" onClick={() => go({ kind: 'book' })}><Icon name="calendar" size={17} /> Book a technician</button>
+                    <a className="btn btn-outline" href={SERVICE_OS_SPEEDY_URL} target="_blank" rel="noreferrer"><Icon name="speedy" size={17} /> Ask Speedy</a>
                   </div>
                 </div>
               </div>
@@ -690,9 +763,6 @@ function HQ({ go }: { go: (v: View) => void }) {
 /* ─── 7. Track ────────────────────────────────────────────────── */
 
 function Track({ go }: { go: (v: View) => void }) {
-  const [code, setCode] = useState('')
-  const [searched, setSearched] = useState(false)
-
   return (
     <>
       <div className="page-hero">
@@ -704,22 +774,21 @@ function Track({ go }: { go: (v: View) => void }) {
       </div>
       <section className="block">
         <div className="wrap split">
-          <form className="form-card" onSubmit={(e) => { e.preventDefault(); setSearched(true) }}>
-            <h2 style={{ color: 'var(--navy)', fontSize: '1.2rem' }}>Have a job code?</h2>
-            <p style={{ color: 'var(--muted)', fontSize: '0.92rem', margin: '0.3rem 0 1rem' }}>Your code is on the confirmation from your setter. Job records are held in Service OS — enter your code there or in Appliance Connect to see live status.</p>
-            <label className="f">Job code<input value={code} onChange={(e) => { setCode(e.target.value); setSearched(false) }} placeholder="e.g. TS-XXXXXX" /></label>
-            <button className="btn btn-navy mt" type="submit"><Icon name="track" size={17} /> Continue to live tracking</button>
-            {searched && (
-              <div className="notice notice-warn mt">
-                <Icon name="alert" size={20} />
-                <p><strong>Your job is tracked in Service OS, not on this page.</strong> Open Service OS or Appliance Connect below and enter your code there — or call {PHONE_DISPLAY} and a setter will update you.</p>
-              </div>
-            )}
-            <div className="mt" style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
-              <a className="btn btn-navy btn-sm" href={SERVICE_OS_URL} target="_blank" rel="noreferrer">Open Service OS</a>
-              <a className="btn btn-outline btn-sm" href="https://appliance-connect.vercel.app" target="_blank" rel="noreferrer">Open Appliance Connect</a>
+          <div className="form-card">
+            <h2 style={{ color: 'var(--navy)', fontSize: '1.2rem' }}>Track your job in Service OS</h2>
+            <p style={{ color: 'var(--muted)', fontSize: '0.92rem', margin: '0.3rem 0 1rem' }}>
+              Service OS tracking asks for two things: your <strong>booking reference</strong> — shown on the
+              confirmation when you booked, it looks like TS-XXXXXX — and the <strong>phone number</strong> on the
+              booking. Enter both there and you’ll see your job’s live stage.
+            </p>
+            <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+              <a className="btn btn-orange" href={SERVICE_OS_TRACK_URL} target="_blank" rel="noreferrer"><Icon name="track" size={17} /> Track your job in Service OS</a>
+              <a className="btn btn-outline" href="https://appliance-connect.vercel.app" target="_blank" rel="noreferrer">Open Appliance Connect</a>
             </div>
-          </form>
+            <p style={{ color: 'var(--muted)', fontSize: '0.9rem', marginTop: '1rem' }}>
+              No reference handy? Call <a href={PHONE_TEL}><strong>{PHONE_DISPLAY}</strong></a> and a setter will update you.
+            </p>
+          </div>
           <div>
             <div className="card" style={{ cursor: 'default' }}>
               <span className="ic"><Icon name="track" size={24} /></span>
@@ -846,7 +915,7 @@ function Footer({ go }: { go: (v: View) => void }) {
           <h4>Network</h4>
           <ul>
             <li><button onClick={() => go({ kind: 'book' })}>Book a repair</button></li>
-            <li><button onClick={() => go({ kind: 'speedy' })}>Speedy guide</button></li>
+            <li><button onClick={() => go({ kind: 'speedy' })}>Speedy</button></li>
             <li><button onClick={() => go({ kind: 'track' })}>Track a job</button></li>
             <li><button onClick={() => go({ kind: 'hq' })}>Network HQ</button></li>
             {SISTER_BRANDS.slice(0, 3).map((b) => (

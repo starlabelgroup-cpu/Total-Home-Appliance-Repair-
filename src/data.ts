@@ -7,6 +7,9 @@ export const PHONE_TEL = 'tel:+19549317997'
 export const PHONE_SMS = 'sms:+19549317997'
 export const EMAIL = 'service@topspeedappliance.net'
 export const SERVICE_OS_URL = 'https://topspeedserviceos.com'
+export const SERVICE_OS_BOOK_URL = 'https://topspeedserviceos.com/book'
+export const SERVICE_OS_SPEEDY_URL = 'https://topspeedserviceos.com/speedy'
+export const SERVICE_OS_TRACK_URL = 'https://topspeedserviceos.com/track'
 
 export interface Service {
   id: string
@@ -312,10 +315,13 @@ export const SISTER_BRANDS: SisterBrand[] = [
   },
 ]
 
-// ─── Speedy — local rule-based demo ─────────────────────────────────────────
-// Possibilities only. Never a diagnosis. Safety warnings come first.
+// ─── Symptom guide — written reference content ──────────────────────────────
+// Plain written guidance maintained by the network: likely causes are
+// possibilities only, never a diagnosis. This is NOT Speedy — Speedy is the
+// real AI assistant at Top Speed Service OS (see the Speedy screen).
+// Safety warnings come first.
 
-export interface SpeedyRule {
+export interface GuideRule {
   appliance: string
   symptom: string
   causes: string[]
@@ -323,7 +329,7 @@ export interface SpeedyRule {
   prep: string[]
 }
 
-export const SPEEDY_RULES: SpeedyRule[] = [
+export const GUIDE_RULES: GuideRule[] = [
   {
     appliance: 'Refrigerator',
     symptom: 'Not cooling',
@@ -491,7 +497,7 @@ export const SPEEDY_RULES: SpeedyRule[] = [
   },
 ]
 
-export const SPEEDY_APPLIANCES = [...new Set(SPEEDY_RULES.map((r) => r.appliance))]
+export const GUIDE_APPLIANCES = [...new Set(GUIDE_RULES.map((r) => r.appliance))]
 
 // ─── Job tracking stages (production) ──────────────────────────────────────
 // Real job tracking lives in Top Speed Service OS and the Appliance Connect

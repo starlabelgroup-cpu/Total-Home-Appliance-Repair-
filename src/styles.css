@@ -232,16 +232,6 @@ label.f input, label.f select, label.f textarea {
 label.f input:focus, label.f select:focus, label.f textarea:focus {
   outline: 2px solid rgba(255, 107, 26, 0.5); border-color: var(--orange);
 }
-.draft-stamp {
-  display: inline-block; border: 2px dashed #c75109; color: #9c4303; background: #fff7f0;
-  font-family: 'Manrope', sans-serif; font-weight: 800; letter-spacing: 0.05em;
-  padding: 0.35rem 0.8rem; border-radius: 8px; transform: rotate(-1.2deg); font-size: 0.85rem;
-}
-pre.draft {
-  background: var(--navy); color: #d7e6f5; border-radius: 12px; padding: 1rem;
-  font-size: 0.83rem; overflow-x: auto; white-space: pre-wrap; word-break: break-word;
-}
-
 /* ─── Tables ─────────────────────────────────────────────── */
 .table-scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); background: #fff; }
 table.fleet { width: 100%; border-collapse: collapse; font-size: 0.92rem; min-width: 560px; }
