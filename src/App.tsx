@@ -1,0 +1,877 @@
+import { useEffect, useMemo, useState } from 'react'
+import {
+  CITIES, DEMO_JOB, DEMO_STATS, EMAIL, PHONE_DISPLAY, PHONE_SMS, PHONE_TEL,
+  SERVICES, SERVICE_OS_URL, SISTER_BRANDS, SPEEDY_APPLIANCES, SPEEDY_RULES,
+} from './data'
+import { Icon, Logo } from './icons'
+
+type View =
+  | { kind: 'hub' }
+  | { kind: 'services' }
+  | { kind: 'service'; id: string }
+  | { kind: 'cities' }
+  | { kind: 'city'; id: string }
+  | { kind: 'book'; serviceId?: string; cityId?: string }
+  | { kind: 'speedy' }
+  | { kind: 'hq' }
+  | { kind: 'track' }
+  | { kind: 'about' }
+
+const NAV: { kind: View['kind']; label: string }[] = [
+  { kind: 'hub', label: 'Network Hub' },
+  { kind: 'services', label: 'Services' },
+  { kind: 'cities', label: 'City Pages' },
+  { kind: 'speedy', label: 'Speedy Guide' },
+  { kind: 'track', label: 'Track a Job' },
+  { kind: 'hq', label: 'Network HQ' },
+  { kind: 'about', label: 'About' },
+]
+
+function serviceById(id?: string) {
+  return SERVICES.find((s) => s.id === id) ?? null
+}
+function cityById(id?: string) {
+  return CITIES.find((c) => c.id === id) ?? null
+}
+
+export default function App() {
+  const [view, setView] = useState<View>({ kind: 'hub' })
+
+  const go = (v: View) => setView(v)
+
+  useEffect(() => {
+    window.scrollTo({ top: 0 })
+  }, [view])
+
+  const navOn = (k: View['kind']) =>
+    view.kind === k || (k === 'services' && view.kind === 'service') || (k === 'cities' && view.kind === 'city')
+
+  return (
+    <>
+      <div className="topbar">
+        <div className="topbar-in">
+          <span className="tb-item"><Icon name="pin" size={14} /> Broward County, Florida — residential appliance repair network</span>
+          <span className="tb-item">
+            Call or text <a href={PHONE_TEL}>{PHONE_DISPLAY}</a>
+            <span aria-hidden>·</span>
+            <a href={`mailto:${EMAIL}`}>{EMAIL}</a>
+          </span>
+        </div>
+      </div>
+
+      <header className="site">
+        <div className="header-in">
+          <button className="brand" onClick={() => go({ kind: 'hub' })} aria-label="Total Home Appliance Repair — home">
+            <Logo size={42} />
+            <span>
+              <span className="brand-name">Total Home<br />Appliance Repair</span>
+              <span className="brand-sub" style={{ display: 'block' }}>A Top Speed Appliance Network</span>
+            </span>
+          </button>
+          <nav className="main" aria-label="Main">
+            {NAV.map((n) => (
+              <button key={n.kind} className={navOn(n.kind) ? 'on' : ''} onClick={() => go({ kind: n.kind } as View)}>
+                {n.label}
+              </button>
+            ))}
+          </nav>
+          <div className="header-cta">
+            <a className="btn btn-ghost btn-sm" href={PHONE_TEL}><Icon name="phone" size={16} /> {PHONE_DISPLAY}</a>
+            <button className="btn btn-orange btn-sm" onClick={() => go({ kind: 'book' })}>Book a Repair</button>
+          </div>
+        </div>
+        <div className="mobile-nav" aria-label="Main mobile">
+          {NAV.map((n) => (
+            <button key={n.kind} className={navOn(n.kind) ? 'on' : ''} onClick={() => go({ kind: n.kind } as View)}>
+              {n.label}
+            </button>
+          ))}
+          <button onClick={() => go({ kind: 'book' })}>Book</button>
+        </div>
+      </header>
+
+      <main>
+        {view.kind === 'hub' && <Hub go={go} />}
+        {view.kind === 'services' && <Services go={go} />}
+        {view.kind === 'service' && <ServiceDetail id={view.id} go={go} />}
+        {view.kind === 'cities' && <Cities go={go} />}
+        {view.kind === 'city' && <CityPage id={view.id} go={go} />}
+        {view.kind === 'book' && <Book key={`${view.serviceId ?? ''}-${view.cityId ?? ''}`} serviceId={view.serviceId} cityId={view.cityId} go={go} />}
+        {view.kind === 'speedy' && <Speedy go={go} />}
+        {view.kind === 'hq' && <HQ go={go} />}
+        {view.kind === 'track' && <Track go={go} />}
+        {view.kind === 'about' && <About go={go} />}
+      </main>
+
+      <Footer go={go} />
+    </>
+  )
+}
+
+/* ─── Shared bits ─────────────────────────────────────────────── */
+
+function CtaRow({ go, serviceId, cityId, light }: { go: (v: View) => void; serviceId?: string; cityId?: string; light?: boolean }) {
+  return (
+    <div className="hero-ctas">
+      <a className="btn btn-orange" href={PHONE_TEL}><Icon name="phone" size={18} /> Call {PHONE_DISPLAY}</a>
+      <a className={`btn ${light ? 'btn-ghost' : 'btn-outline'}`} href={PHONE_SMS}><Icon name="chat" size={18} /> Text us</a>
+      <button className={`btn ${light ? 'btn-ghost' : 'btn-navy'}`} onClick={() => go({ kind: 'book', serviceId, cityId })}>
+        <Icon name="calendar" size={18} /> Book through Service OS
+      </button>
+    </div>
+  )
+}
+
+function RoutingDiagram() {
+  return (
+    <div className="diagram" role="img" aria-label="Lead routing: any network page routes to Service OS, where Service Setters confirm the job, then a technician is dispatched and the job is tracked.">
+      <div className="d-node"><strong>Any network page</strong>Hub, a service page, or a city page — the customer starts wherever they land.</div>
+      <div className="d-arrow">▼</div>
+      <div className="d-node hl"><strong>Top Speed Service OS</strong>Every request is submitted in one system — no page keeps its own leads.</div>
+      <div className="d-arrow">▼</div>
+      <div className="d-node"><strong>Setters confirm → tech dispatched</strong>Human Service Setters confirm every job before dispatch, and the customer tracks it in Service OS.</div>
+    </div>
+  )
+}
+
+/* ─── 1. Network Hub ──────────────────────────────────────────── */
+
+function Hub({ go }: { go: (v: View) => void }) {
+  return (
+    <>
+      <div className="hero">
+        <div className="wrap">
+          <span className="pill pill-dark">The residential repair network of Top Speed Appliance</span>
+          <h1 style={{ marginTop: '1rem' }}>Every appliance. Every home. <em>One network.</em></h1>
+          <p className="lede">
+            Total Home Appliance Repair is one master hub plus a fleet of service and city pages across Broward County —
+            and every page routes its bookings to the same place: Top Speed Service OS, where human Service Setters
+            confirm each job before a technician is dispatched.
+          </p>
+          <CtaRow go={go} light />
+          <div className="hero-meta">
+            <span><Icon name="shield" size={16} /> Confirmed by a human setter — never auto-dispatched</span>
+            <span><Icon name="route" size={16} /> One routing system for the whole fleet</span>
+            <span><Icon name="pin" size={16} /> 16 Broward city pages · 10 service pages</span>
+          </div>
+        </div>
+      </div>
+
+      <section className="block">
+        <div className="wrap">
+          <span className="kicker"><Icon name="grid" size={14} /> Repair services</span>
+          <h2 className="sec-title">Ten services, ten dedicated pages</h2>
+          <p className="sec-sub">Each service has its own page in the fleet — common problems, what the technician checks, and a booking path that lands in the same Service OS queue.</p>
+          <div className="grid grid-5 mt-lg">
+            {SERVICES.map((s) => (
+              <button key={s.id} className="card" onClick={() => go({ kind: 'service', id: s.id })}>
+                <span className="ic"><Icon name={s.icon} size={24} /></span>
+                <h3>{s.name.replace(' Repair', '')}</h3>
+                <p>{s.tagline}</p>
+                <span className="go">View service page <Icon name="arrow" size={15} /></span>
+              </button>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="block tight" style={{ background: '#fff', borderTop: '1px solid var(--line)', borderBottom: '1px solid var(--line)' }}>
+        <div className="wrap">
+          <span className="kicker"><Icon name="route" size={14} /> How the network works</span>
+          <h2 className="sec-title">One request path, from any page</h2>
+          <div className="steps mt-lg">
+            <div className="step"><span className="num">1</span><h3>You send a request</h3><p>From the hub, a service page or your city page — by booking prep, call or text to {PHONE_DISPLAY}.</p></div>
+            <div className="step"><span className="num">2</span><h3>A setter confirms it</h3><p>Your request is submitted in Top Speed Service OS, where a human Service Setter reviews and confirms the job.</p></div>
+            <div className="step"><span className="num">3</span><h3>A technician is dispatched</h3><p>Only confirmed jobs go out. The technician arrives knowing the appliance, the problem and the city.</p></div>
+            <div className="step"><span className="num">4</span><h3>You track it in Service OS</h3><p>Job status lives in Service OS and the Appliance Connect portal — one record, start to finish.</p></div>
+          </div>
+          <div className="mt-lg"><RoutingDiagram /></div>
+        </div>
+      </section>
+
+      <section className="block">
+        <div className="wrap">
+          <span className="kicker"><Icon name="hub" size={14} /> Network structure</span>
+          <h2 className="sec-title">Built like a network, not a brochure</h2>
+          <p className="sec-sub">One hub holds the fleet together. Service pages answer “what’s broken,” city pages answer “near me,” and sister brands cover the jobs around the repair.</p>
+          <div className="grid grid-3 mt-lg">
+            <button className="card" onClick={() => go({ kind: 'services' })}>
+              <span className="ic"><Icon name="wrench" size={24} /></span>
+              <h3>10 service pages</h3>
+              <p>Refrigerator through wine cooler — symptoms, checks and a preselected booking for each appliance.</p>
+              <span className="go">Browse services <Icon name="arrow" size={15} /></span>
+            </button>
+            <button className="card" onClick={() => go({ kind: 'cities' })}>
+              <span className="ic"><Icon name="pin" size={24} /></span>
+              <h3>16 city pages</h3>
+              <p>Every Broward city in the network gets the same full fleet — generated from one city × service table.</p>
+              <span className="go">Browse city pages <Icon name="arrow" size={15} /></span>
+            </button>
+            <button className="card" onClick={() => go({ kind: 'hq' })}>
+              <span className="ic"><Icon name="layers" size={24} /></span>
+              <h3>6 sister brands</h3>
+              <p>Service OS, Appliance Connect, Clean Out Vents, Appliance Express, Appliance Plus and Gateway Express.</p>
+              <span className="go">See Network HQ <Icon name="arrow" size={15} /></span>
+            </button>
+          </div>
+          <div className="notice notice-info mt-lg">
+            <Icon name="shield" size={20} />
+            <p><strong>Straight talk on pricing:</strong> this site lists no prices. Your price is confirmed when you book through Service OS, before any work starts — nothing is dispatched or charged from a web form alone.</p>
+          </div>
+        </div>
+      </section>
+    </>
+  )
+}
+
+/* ─── 2. Services ─────────────────────────────────────────────── */
+
+function Services({ go }: { go: (v: View) => void }) {
+  return (
+    <>
+      <div className="page-hero">
+        <div className="wrap">
+          <h1>Repair services</h1>
+          <p>Every service below is its own page in the network fleet. Open one for the problems we see most, what the technician checks, and a booking with that service already selected.</p>
+        </div>
+      </div>
+      <section className="block">
+        <div className="wrap">
+          <div className="grid grid-3">
+            {SERVICES.map((s) => (
+              <button key={s.id} className="card" onClick={() => go({ kind: 'service', id: s.id })}>
+                <span className="ic"><Icon name={s.icon} size={24} /></span>
+                <h3>{s.name}</h3>
+                <p>{s.tagline}</p>
+                <p style={{ marginTop: '0.5rem' }}>{s.problems.length} common problems · {s.checks.length} technician checks</p>
+                <span className="go">Open service page <Icon name="arrow" size={15} /></span>
+              </button>
+            ))}
+          </div>
+        </div>
+      </section>
+    </>
+  )
+}
+
+function ServiceDetail({ id, go }: { id: string; go: (v: View) => void }) {
+  const s = serviceById(id)
+  if (!s) return <Services go={go} />
+  return (
+    <>
+      <div className="page-hero">
+        <div className="wrap">
+          <p className="crumb"><button onClick={() => go({ kind: 'services' })}>Services</button> / {s.name}</p>
+          <span className="pill pill-dark">Service page · Total Home Appliance Repair network</span>
+          <h1 style={{ marginTop: '0.7rem' }}>{s.name}</h1>
+          <p>{s.tagline} Available across all 16 Broward network cities, booked through Top Speed Service OS.</p>
+          <div style={{ marginTop: '1.4rem' }}><CtaRow go={go} serviceId={s.id} light /></div>
+        </div>
+      </div>
+      <section className="block">
+        <div className="wrap split">
+          <div className="card" style={{ cursor: 'default' }}>
+            <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Icon name="alert" size={20} /> Common problems we’re called for</h3>
+            <ul className="prob-list mt">
+              {s.problems.map((p) => <li key={p}><Icon name="arrow" size={16} /> {p}</li>)}
+            </ul>
+          </div>
+          <div className="card" style={{ cursor: 'default' }}>
+            <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Icon name="wrench" size={20} /> What the technician checks</h3>
+            <ul className="checklist mt">
+              {s.checks.map((c) => <li key={c}><Icon name="check" size={16} /> {c}</li>)}
+            </ul>
+          </div>
+        </div>
+        <div className="wrap">
+          <div className="notice notice-warn mt-lg">
+            <Icon name="speedy" size={20} />
+            <p><strong>Not sure it’s the {s.name.replace(' Repair', '').toLowerCase()}?</strong> Try the Speedy guide for likely causes and safety notes first — it’s a local demo that points you in the right direction, not a diagnosis. And remember: pricing is confirmed when you book through Service OS.</p>
+          </div>
+          <div className="mt" style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+            <button className="btn btn-navy" onClick={() => go({ kind: 'speedy' })}><Icon name="speedy" size={17} /> Ask Speedy first</button>
+            <button className="btn btn-orange" onClick={() => go({ kind: 'book', serviceId: s.id })}><Icon name="calendar" size={17} /> Book {s.name.replace(' Repair', '')} repair</button>
+            <button className="btn btn-outline" onClick={() => go({ kind: 'cities' })}><Icon name="pin" size={17} /> Find your city page</button>
+          </div>
+        </div>
+      </section>
+    </>
+  )
+}
+
+/* ─── 3. City pages ───────────────────────────────────────────── */
+
+function Cities({ go }: { go: (v: View) => void }) {
+  return (
+    <>
+      <div className="page-hero">
+        <div className="wrap">
+          <h1>City pages — the local fleet</h1>
+          <p>Sixteen Broward County cities, one page each, all generated from a single city × service table and all routing to the same Service OS setters. Four core cities anchor the network; twelve more extend it across Broward.</p>
+        </div>
+      </div>
+      <section className="block">
+        <div className="wrap">
+          <h2 className="sec-title" style={{ fontSize: '1.3rem' }}>Core network cities</h2>
+          <div className="grid grid-2 mt">
+            {CITIES.filter((c) => c.core).map((c) => <CityCard key={c.id} id={c.id} go={go} />)}
+          </div>
+          <h2 className="sec-title mt-lg" style={{ fontSize: '1.3rem' }}>Wider Broward network</h2>
+          <div className="grid grid-3 mt">
+            {CITIES.filter((c) => !c.core).map((c) => <CityCard key={c.id} id={c.id} go={go} />)}
+          </div>
+        </div>
+      </section>
+    </>
+  )
+}
+
+function CityCard({ id, go }: { id: string; go: (v: View) => void }) {
+  const c = cityById(id)!
+  return (
+    <button className="card" onClick={() => go({ kind: 'city', id: c.id })}>
+      <span className="ic"><Icon name="pin" size={24} /></span>
+      <h3>{c.name} <span className={`pill ${c.core ? 'pill-core' : 'pill-net'}`} style={{ marginLeft: '0.4rem' }}>{c.core ? 'Core city' : 'Network city'}</span></h3>
+      <p>{c.blurb}</p>
+      <span className="go">Open the {c.name} page <Icon name="arrow" size={15} /></span>
+    </button>
+  )
+}
+
+function CityPage({ id, go }: { id: string; go: (v: View) => void }) {
+  const c = cityById(id)
+  if (!c) return <Cities go={go} />
+  const siblings = CITIES.filter((x) => x.id !== c.id)
+  return (
+    <>
+      <div className="page-hero">
+        <div className="wrap">
+          <p className="crumb"><button onClick={() => go({ kind: 'cities' })}>City Pages</button> / {c.name}</p>
+          <span className={`pill ${c.core ? 'pill-core' : 'pill-dark'}`}>{c.core ? 'Core network city' : 'Broward network city'}</span>
+          <h1 style={{ marginTop: '0.7rem' }}>Appliance Repair in {c.name}</h1>
+          <p>{c.blurb} Bookings from this page are submitted through Top Speed Service OS and confirmed by a Service Setter before dispatch — the same as every page in the fleet.</p>
+          <div style={{ marginTop: '1.4rem' }}><CtaRow go={go} cityId={c.id} light /></div>
+        </div>
+      </div>
+      <section className="block">
+        <div className="wrap">
+          <span className="kicker"><Icon name="grid" size={14} /> Services in {c.name}</span>
+          <h2 className="sec-title">All ten services, available in {c.name}</h2>
+          <div className="grid grid-5 mt-lg">
+            {SERVICES.map((s) => (
+              <button key={s.id} className="card" onClick={() => go({ kind: 'service', id: s.id })}>
+                <span className="ic"><Icon name={s.icon} size={24} /></span>
+                <h3>{s.name.replace(' Repair', '')}</h3>
+                <p>{s.tagline}</p>
+                <span className="go">View & book <Icon name="arrow" size={15} /></span>
+              </button>
+            ))}
+          </div>
+
+          <h2 className="sec-title mt-lg" style={{ fontSize: '1.3rem' }}>Other city pages in the fleet</h2>
+          <div className="chips mt">
+            {siblings.map((x) => (
+              <button key={x.id} className="chip" onClick={() => go({ kind: 'city', id: x.id })}>{x.name}</button>
+            ))}
+          </div>
+        </div>
+      </section>
+    </>
+  )
+}
+
+/* ─── 4. Book ─────────────────────────────────────────────────── */
+
+interface Draft {
+  name: string
+  phone: string
+  city: string
+  service: string
+  appliance: string
+  problem: string
+  window: string
+  utm_source: string
+  utm_medium: string
+  utm_campaign: string
+  gclid: string
+  savedAt: string
+}
+
+const DRAFT_KEY = 'thar-booking-draft'
+
+function Book({ serviceId, cityId, go }: { serviceId?: string; cityId?: string; go: (v: View) => void }) {
+  const svc = serviceById(serviceId)
+  const cty = cityById(cityId)
+  const [form, setForm] = useState({
+    name: '', phone: '',
+    city: cty?.name ?? '',
+    service: svc?.name ?? '',
+    appliance: '', problem: '', window: 'First available',
+  })
+  const [draft, setDraft] = useState<Draft | null>(null)
+
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(DRAFT_KEY)
+      if (raw) setDraft(JSON.parse(raw) as Draft)
+    } catch { /* session storage unavailable */ }
+  }, [])
+
+  const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
+    setForm((f) => ({ ...f, [k]: e.target.value }))
+
+  const saveDraft = (e: React.FormEvent) => {
+    e.preventDefault()
+    const params = new URLSearchParams(window.location.search)
+    const d: Draft = {
+      ...form,
+      utm_source: params.get('utm_source') ?? '',
+      utm_medium: params.get('utm_medium') ?? '',
+      utm_campaign: params.get('utm_campaign') ?? '',
+      gclid: params.get('gclid') ?? '',
+      savedAt: new Date().toLocaleString(),
+    }
+    try { sessionStorage.setItem(DRAFT_KEY, JSON.stringify(d)) } catch { /* ignore */ }
+    setDraft(d)
+  }
+
+  return (
+    <>
+      <div className="page-hero">
+        <div className="wrap">
+          <h1>Book a repair</h1>
+          <p>Prepare your request here, then submit it where every network booking is submitted — Top Speed Service OS. A Service Setter confirms every job before a technician is dispatched.</p>
+        </div>
+      </div>
+      <section className="block">
+        <div className="wrap split">
+          <form className="form-card" onSubmit={saveDraft}>
+            <h2 style={{ color: 'var(--navy)', fontSize: '1.2rem' }}>Booking prep form</h2>
+            <p style={{ color: 'var(--muted)', fontSize: '0.92rem', margin: '0.3rem 0 1.1rem' }}>
+              This form saves a <strong>local draft on this device only</strong>. It does not send anything — step 2 below is where the real request is submitted.
+            </p>
+            <div className="form-grid">
+              <label className="f">Your name<input required value={form.name} onChange={set('name')} placeholder="Full name" /></label>
+              <label className="f">Phone (call/text)<input required value={form.phone} onChange={set('phone')} placeholder="Best number for the setter" /></label>
+              <label className="f">City
+                <select required value={form.city} onChange={set('city')}>
+                  <option value="">Select your city…</option>
+                  {CITIES.map((c) => <option key={c.id} value={c.name}>{c.name}{c.core ? ' (core)' : ''}</option>)}
+                </select>
+              </label>
+              <label className="f">Service
+                <select required value={form.service} onChange={set('service')}>
+                  <option value="">Select a service…</option>
+                  {SERVICES.map((s) => <option key={s.id} value={s.name}>{s.name}</option>)}
+                </select>
+              </label>
+              <label className="f">Appliance (brand / model if known)<input value={form.appliance} onChange={set('appliance')} placeholder="e.g. Samsung French-door fridge" /></label>
+              <label className="f">Preferred window
+                <select value={form.window} onChange={set('window')}>
+                  <option>First available</option>
+                  <option>Morning</option>
+                  <option>Afternoon</option>
+                  <option>Evening</option>
+                </select>
+              </label>
+              <label className="f full">What’s the problem?<textarea required rows={4} value={form.problem} onChange={set('problem')} placeholder="Describe the symptom — noises, leaks, error codes, when it started…" /></label>
+            </div>
+            <button className="btn btn-navy mt" type="submit"><Icon name="check" size={17} /> Save my local draft</button>
+          </form>
+
+          <div className="stack">
+            <div className="card" style={{ cursor: 'default' }}>
+              <h3>How booking actually works</h3>
+              <ul className="checklist mt">
+                <li><Icon name="check" size={16} /> <span><strong>Step 1 — Prep here.</strong> Fill in the form and save the local draft. It stays in this browser.</span></li>
+                <li><Icon name="check" size={16} /> <span><strong>Step 2 — Submit in Service OS.</strong> Send the real request at topspeedserviceos.com — that’s the system the setters work from.</span></li>
+                <li><Icon name="check" size={16} /> <span><strong>Step 3 — A setter confirms.</strong> A human confirms the job, the window and the pricing before dispatch.</span></li>
+              </ul>
+              <div className="mt" style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+                <a className="btn btn-orange" href={SERVICE_OS_URL} target="_blank" rel="noreferrer">Submit at Service OS <Icon name="arrow" size={16} /></a>
+                <a className="btn btn-outline" href={PHONE_TEL}><Icon name="phone" size={16} /> {PHONE_DISPLAY}</a>
+              </div>
+            </div>
+            <div className="notice notice-info">
+              <Icon name="shield" size={20} />
+              <p><strong>No prices on this site — on purpose.</strong> Pricing is confirmed when you book through Service OS, before any work begins.</p>
+            </div>
+            {draft && (
+              <div className="card" style={{ cursor: 'default' }}>
+                <span className="draft-stamp">LOCAL DRAFT ONLY — NOT SUBMITTED</span>
+                <p style={{ margin: '0.7rem 0', color: 'var(--muted)', fontSize: '0.9rem' }}>
+                  Saved {draft.savedAt} in this browser only. Nothing was sent to dispatch. Take these details to Service OS, or read them out when you call.
+                </p>
+                <pre className="draft">{JSON.stringify(draft, null, 2)}</pre>
+                <div className="mt" style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+                  <a className="btn btn-orange btn-sm" href={SERVICE_OS_URL} target="_blank" rel="noreferrer">Submit it at Service OS</a>
+                  <a className="btn btn-outline btn-sm" href={PHONE_SMS}>Text it instead</a>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+    </>
+  )
+}
+
+/* ─── 5. Speedy ───────────────────────────────────────────────── */
+
+function Speedy({ go }: { go: (v: View) => void }) {
+  const [appliance, setAppliance] = useState(SPEEDY_APPLIANCES[0])
+  const symptoms = useMemo(() => SPEEDY_RULES.filter((r) => r.appliance === appliance), [appliance])
+  const [symptom, setSymptom] = useState(symptoms[0]?.symptom ?? '')
+  const rule = SPEEDY_RULES.find((r) => r.appliance === appliance && r.symptom === symptom) ?? symptoms[0]
+
+  return (
+    <>
+      <div className="page-hero">
+        <div className="wrap">
+          <span className="pill pill-demo">Local rule-based demo</span>
+          <h1 style={{ marginTop: '0.7rem' }}>Speedy — the network guide</h1>
+          <p>Pick an appliance and a symptom. Speedy matches it against a small set of built-in rules and shows likely causes, safety warnings and prep steps — then hands you off to book a real technician.</p>
+        </div>
+      </div>
+      <section className="block">
+        <div className="wrap">
+          <div className="notice notice-warn">
+            <Icon name="alert" size={20} />
+            <p><strong>Honest labels, up front:</strong> Speedy here is a <strong>local rule-based demo</strong> running entirely in your browser. It is <strong>not a live AI</strong>, it is <strong>not connected</strong> to Service OS, and its answers are <strong>possibilities, not a professional diagnosis</strong>. Only a technician inspecting the appliance can diagnose it.</p>
+          </div>
+
+          <div className="form-card mt-lg">
+            <div className="form-grid">
+              <label className="f">Appliance
+                <select value={appliance} onChange={(e) => { setAppliance(e.target.value); const s = SPEEDY_RULES.find((r) => r.appliance === e.target.value); setSymptom(s?.symptom ?? '') }}>
+                  {SPEEDY_APPLIANCES.map((a) => <option key={a} value={a}>{a}</option>)}
+                </select>
+              </label>
+              <label className="f">Symptom
+                <select value={symptom} onChange={(e) => setSymptom(e.target.value)}>
+                  {symptoms.map((r) => <option key={r.symptom} value={r.symptom}>{r.symptom}</option>)}
+                </select>
+              </label>
+            </div>
+          </div>
+
+          {rule && (
+            <div className="split mt-lg">
+              <div className="card" style={{ cursor: 'default' }}>
+                <h3 style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}><Icon name="speedy" size={20} /> Likely causes — possibilities only</h3>
+                <ul className="prob-list mt">
+                  {rule.causes.map((c) => <li key={c}><Icon name="arrow" size={16} /> {c}</li>)}
+                </ul>
+                <p style={{ color: 'var(--muted)', fontSize: '0.88rem', marginTop: '0.9rem' }}>Ordered roughly most-common first for a {rule.appliance.toLowerCase()} that {rule.symptom.toLowerCase()}. Your appliance may have a different cause entirely.</p>
+              </div>
+              <div className="stack">
+                {rule.safety && (
+                  <div className="notice notice-warn">
+                    <Icon name="alert" size={20} />
+                    <p><strong>Safety first:</strong> {rule.safety}</p>
+                  </div>
+                )}
+                <div className="card" style={{ cursor: 'default' }}>
+                  <h3>Before the technician arrives</h3>
+                  <ul className="checklist mt">
+                    {rule.prep.map((p) => <li key={p}><Icon name="check" size={16} /> {p}</li>)}
+                  </ul>
+                  <div className="mt">
+                    <button className="btn btn-orange" onClick={() => go({ kind: 'book' })}><Icon name="calendar" size={17} /> Book a technician</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </section>
+    </>
+  )
+}
+
+/* ─── 6. Network HQ ───────────────────────────────────────────── */
+
+function HQ({ go }: { go: (v: View) => void }) {
+  const maxLeads = Math.max(...DEMO_STATS.leadsByPage.map((d) => d.leads))
+  return (
+    <>
+      <div className="page-hero">
+        <div className="wrap">
+          <span className="pill pill-dark">Network layer</span>
+          <h1 style={{ marginTop: '0.7rem' }}>Network HQ</h1>
+          <p>The whole fleet on one page: every service page and city page, the sister brands each page can hand off to, and the single routing path every lead takes.</p>
+        </div>
+      </div>
+      <section className="block">
+        <div className="wrap stack">
+          <div>
+            <h2 className="sec-title" style={{ fontSize: '1.35rem' }}>How a lead moves through the network</h2>
+            <div className="mt"><RoutingDiagram /></div>
+          </div>
+
+          <div>
+            <h2 className="sec-title" style={{ fontSize: '1.35rem' }}>Fleet index — service pages (10)</h2>
+            <div className="table-scroll mt">
+              <table className="fleet">
+                <thead><tr><th>Page</th><th>Type</th><th>Routes to</th><th>Status</th><th></th></tr></thead>
+                <tbody>
+                  {SERVICES.map((s) => (
+                    <tr key={s.id}>
+                      <td><strong>{s.name}</strong></td>
+                      <td>Service page</td>
+                      <td>Service OS setters</td>
+                      <td><span className="pill pill-live">Live in this demo</span></td>
+                      <td><button className="link" onClick={() => go({ kind: 'service', id: s.id })}>Open</button></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div>
+            <h2 className="sec-title" style={{ fontSize: '1.35rem' }}>Fleet index — city pages (16)</h2>
+            <div className="table-scroll mt">
+              <table className="fleet">
+                <thead><tr><th>Page</th><th>Network tier</th><th>Services offered</th><th>Status</th><th></th></tr></thead>
+                <tbody>
+                  {CITIES.map((c) => (
+                    <tr key={c.id}>
+                      <td><strong>Appliance Repair in {c.name}</strong></td>
+                      <td>{c.core ? 'Core city' : 'Network city'}</td>
+                      <td>All 10 services</td>
+                      <td><span className="pill pill-live">Live in this demo</span></td>
+                      <td><button className="link" onClick={() => go({ kind: 'city', id: c.id })}>Open</button></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p style={{ color: 'var(--muted)', fontSize: '0.9rem', marginTop: '0.7rem' }}>Plus this hub itself — 27 pages in the fleet, one booking system behind all of them.</p>
+          </div>
+
+          <div>
+            <h2 className="sec-title" style={{ fontSize: '1.35rem' }}>Sister brands in the network</h2>
+            <div className="grid grid-3 mt">
+              {SISTER_BRANDS.map((b) => (
+                <div key={b.name} className="card" style={{ cursor: 'default' }}>
+                  <span className="ic"><Icon name="layers" size={24} /></span>
+                  <h3>{b.name}</h3>
+                  <p><strong style={{ color: 'var(--navy)' }}>{b.role}.</strong> {b.note}</p>
+                  <a className="go" href={b.url} target="_blank" rel="noreferrer" style={{ textDecoration: 'none' }}>Visit site <Icon name="arrow" size={15} /></a>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="card" style={{ cursor: 'default' }}>
+            <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
+              <h3 style={{ margin: 0 }}>Demo network stats</h3>
+              <span className="pill pill-demo">Demo data</span>
+            </div>
+            <p style={{ marginTop: '0.4rem' }}>{DEMO_STATS.note}</p>
+            <div className="stack mt">
+              {DEMO_STATS.leadsByPage.map((d) => (
+                <div key={d.page} style={{ display: 'grid', gridTemplateColumns: 'minmax(150px, 1fr) 2fr 40px', gap: '0.8rem', alignItems: 'center', fontSize: '0.92rem' }}>
+                  <span>{d.page}</span>
+                  <span className="bar"><i style={{ width: `${(d.leads / maxLeads) * 100}%` }} /></span>
+                  <strong>{d.leads}</strong>
+                </div>
+              ))}
+            </div>
+            <p style={{ color: 'var(--muted)', fontSize: '0.85rem', marginTop: '0.8rem' }}>“Leads by page” — illustrative only, to show how the network would report which fleet pages produce bookings once connected.</p>
+          </div>
+        </div>
+      </section>
+    </>
+  )
+}
+
+/* ─── 7. Track ────────────────────────────────────────────────── */
+
+function Track({ go }: { go: (v: View) => void }) {
+  const [code, setCode] = useState('')
+  const [searched, setSearched] = useState(false)
+  const found = code.trim().toUpperCase() === DEMO_JOB.code
+  const currentIdx = DEMO_JOB.stages.indexOf(DEMO_JOB.stage)
+
+  return (
+    <>
+      <div className="page-hero">
+        <div className="wrap">
+          <span className="pill pill-demo">Demo data</span>
+          <h1 style={{ marginTop: '0.7rem' }}>Track a job</h1>
+          <p>A preview of how tracking feels. Real job tracking lives in Top Speed Service OS and the Appliance Connect portal — it is not connected to this page.</p>
+        </div>
+      </div>
+      <section className="block">
+        <div className="wrap split">
+          <form className="form-card" onSubmit={(e) => { e.preventDefault(); setSearched(true) }}>
+            <h2 style={{ color: 'var(--navy)', fontSize: '1.2rem' }}>Enter a job code</h2>
+            <p style={{ color: 'var(--muted)', fontSize: '0.92rem', margin: '0.3rem 0 1rem' }}>Try the demo code <strong>DEMO-1042</strong> to see the timeline.</p>
+            <label className="f">Job code<input value={code} onChange={(e) => { setCode(e.target.value); setSearched(false) }} placeholder="e.g. DEMO-1042" /></label>
+            <button className="btn btn-navy mt" type="submit"><Icon name="track" size={17} /> Look up</button>
+            {searched && !found && (
+              <div className="notice notice-warn mt">
+                <Icon name="alert" size={20} />
+                <p><strong>Not found here — and it wouldn’t be.</strong> This demo only knows the code DEMO-1042. For a real job, track it in Service OS or Appliance Connect, or call {PHONE_DISPLAY}.</p>
+              </div>
+            )}
+          </form>
+          <div>
+            {found ? (
+              <div className="card" style={{ cursor: 'default' }}>
+                <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <h3 style={{ margin: 0 }}>{DEMO_JOB.code} — {DEMO_JOB.service}</h3>
+                  <span className="pill pill-demo">Demo data</span>
+                </div>
+                <p style={{ marginTop: '0.4rem' }}>{DEMO_JOB.city} · Current stage: <strong>{DEMO_JOB.stage}</strong></p>
+                <ul className="timeline">
+                  {DEMO_JOB.stages.map((st, i) => (
+                    <li key={st} className={i < currentIdx ? 'done' : i === currentIdx ? 'now' : ''}>
+                      <span className="dot">{i < currentIdx ? <Icon name="check" size={12} /> : null}</span>
+                      <span>
+                        <span className="t-name">{st}</span>
+                        <span className="t-note" style={{ display: 'block' }}>
+                          {i < currentIdx ? 'Completed (demo)' : i === currentIdx ? 'Where this demo job sits now' : 'Still ahead (demo)'}
+                        </span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                <p style={{ color: 'var(--muted)', fontSize: '0.88rem' }}>{DEMO_JOB.note}</p>
+              </div>
+            ) : (
+              <div className="card" style={{ cursor: 'default' }}>
+                <span className="ic"><Icon name="track" size={24} /></span>
+                <h3>Where real tracking lives</h3>
+                <p>Once a setter confirms your job in Service OS, its status — assigned, on the way, in progress, done — is tracked there and in the Appliance Connect customer portal.</p>
+                <div className="mt" style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+                  <a className="btn btn-navy btn-sm" href={SERVICE_OS_URL} target="_blank" rel="noreferrer">Open Service OS</a>
+                  <a className="btn btn-outline btn-sm" href="https://appliance-connect.vercel.app" target="_blank" rel="noreferrer">Open Appliance Connect</a>
+                  <button className="btn btn-outline btn-sm" onClick={() => go({ kind: 'book' })}>Book a repair</button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+    </>
+  )
+}
+
+/* ─── 8. About / Contact ──────────────────────────────────────── */
+
+function About({ go }: { go: (v: View) => void }) {
+  return (
+    <>
+      <div className="page-hero">
+        <div className="wrap">
+          <h1>About the network</h1>
+          <p>Total Home Appliance Repair is the residential appliance repair network of Top Speed Appliance — built so a homeowner anywhere in Broward finds one clear page for their problem and their city, and lands in one well-run booking system.</p>
+        </div>
+      </div>
+      <section className="block">
+        <div className="wrap split">
+          <div className="stack">
+            <div className="card" style={{ cursor: 'default' }}>
+              <h3>Why a network?</h3>
+              <p style={{ marginTop: '0.4rem' }}>
+                A single page can’t answer “dryer repair in Weston” and “refrigerator repair in Coral Springs” equally well.
+                So the network splits the job: <strong>service pages</strong> go deep on each appliance, <strong>city pages</strong> localize
+                the same fleet, and this <strong>hub</strong> holds it together. Behind all of it sits one operating system —
+                Top Speed Service OS — where human Service Setters confirm every job before dispatch. No page freelances;
+                no lead lands in a dead inbox.
+              </p>
+            </div>
+            <div className="card" style={{ cursor: 'default' }}>
+              <h3>Part of a bigger family</h3>
+              <p style={{ marginTop: '0.4rem' }}>
+                When a repair turns into a replacement, Appliance Express sources the new unit. When the real problem is a
+                clogged vent, Clean Out Vents cleans the run. When a job needs a part, Appliance Plus matches it. And
+                customers follow their jobs in Appliance Connect. It’s one ecosystem, coordinated by Gateway Express.
+              </p>
+              <div className="mt"><button className="btn btn-navy btn-sm" onClick={() => go({ kind: 'hq' })}>See the full network at HQ <Icon name="arrow" size={15} /></button></div>
+            </div>
+          </div>
+          <div className="stack">
+            <div className="card" style={{ cursor: 'default' }}>
+              <h3>Contact the network</h3>
+              <ul className="checklist mt">
+                <li><Icon name="phone" size={16} /> <span>Call or text: <a href={PHONE_TEL}><strong>{PHONE_DISPLAY}</strong></a></span></li>
+                <li><Icon name="mail" size={16} /> <span>Email: <a href={`mailto:${EMAIL}`}><strong>{EMAIL}</strong></a></span></li>
+                <li><Icon name="route" size={16} /> <span>Bookings: submitted and confirmed through <a href={SERVICE_OS_URL} target="_blank" rel="noreferrer"><strong>topspeedserviceos.com</strong></a></span></li>
+              </ul>
+            </div>
+            <div className="card" style={{ cursor: 'default' }}>
+              <h3>Service area</h3>
+              <p style={{ marginTop: '0.4rem' }}>Broward County, Florida. Core cities: Coral Springs, Sunrise, Plantation and Fort Lauderdale — plus Coconut Creek, Pompano Beach, Deerfield Beach, Margate, Tamarac, Davie, Weston, Parkland, Lauderhill, Hollywood, Pembroke Pines and Miramar on their own city pages.</p>
+              <div className="mt"><button className="btn btn-outline btn-sm" onClick={() => go({ kind: 'cities' })}><Icon name="pin" size={15} /> Browse all 16 city pages</button></div>
+            </div>
+            <div className="notice notice-info">
+              <Icon name="shield" size={20} />
+              <p><strong>How we work:</strong> every request is confirmed by a human Service Setter before dispatch, and pricing is confirmed when you book through Service OS — before any work starts.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+    </>
+  )
+}
+
+/* ─── Footer ──────────────────────────────────────────────────── */
+
+function Footer({ go }: { go: (v: View) => void }) {
+  return (
+    <footer className="site">
+      <div className="footer-in">
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+            <Logo size={38} />
+            <div>
+              <div style={{ color: '#fff', fontFamily: 'Manrope, sans-serif', fontWeight: 800, lineHeight: 1.15 }}>Total Home Appliance Repair</div>
+              <div style={{ fontSize: '0.7rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: '#ffb287', fontWeight: 700 }}>A Top Speed Appliance Network</div>
+            </div>
+          </div>
+          <p style={{ marginTop: '0.9rem', fontSize: '0.9rem', maxWidth: 300 }}>
+            One hub, 10 service pages and 16 city pages across Broward County — every booking routed through Top Speed Service OS and confirmed by a Service Setter.
+          </p>
+          <p style={{ marginTop: '0.8rem', fontSize: '0.9rem' }}>
+            Call or text <a href={PHONE_TEL} style={{ color: '#fff', fontWeight: 700 }}>{PHONE_DISPLAY}</a><br />
+            <a href={`mailto:${EMAIL}`} style={{ color: '#fff' }}>{EMAIL}</a>
+          </p>
+        </div>
+        <div>
+          <h4>Services</h4>
+          <ul>
+            {SERVICES.slice(0, 6).map((s) => <li key={s.id}><button onClick={() => go({ kind: 'service', id: s.id })}>{s.name}</button></li>)}
+            <li><button onClick={() => go({ kind: 'services' })}>All services →</button></li>
+          </ul>
+        </div>
+        <div>
+          <h4>Core cities</h4>
+          <ul>
+            {CITIES.filter((c) => c.core).map((c) => <li key={c.id}><button onClick={() => go({ kind: 'city', id: c.id })}>Repair in {c.name}</button></li>)}
+            <li><button onClick={() => go({ kind: 'cities' })}>All 16 city pages →</button></li>
+          </ul>
+        </div>
+        <div>
+          <h4>Network</h4>
+          <ul>
+            <li><button onClick={() => go({ kind: 'book' })}>Book a repair</button></li>
+            <li><button onClick={() => go({ kind: 'speedy' })}>Speedy guide (demo)</button></li>
+            <li><button onClick={() => go({ kind: 'track' })}>Track a job (demo)</button></li>
+            <li><button onClick={() => go({ kind: 'hq' })}>Network HQ</button></li>
+            {SISTER_BRANDS.slice(0, 3).map((b) => (
+              <li key={b.name}><a href={b.url} target="_blank" rel="noreferrer">{b.name}</a></li>
+            ))}
+          </ul>
+        </div>
+      </div>
+      <div className="footer-base">
+        Total Home Appliance Repair — the residential appliance repair network of Top Speed Appliance · Broward County, FL.
+        Pricing is confirmed when you book through Service OS. Demo content on this site is labeled as such.
+      </div>
+    </footer>
+  )
+}
