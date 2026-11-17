@@ -493,36 +493,23 @@ export const SPEEDY_RULES: SpeedyRule[] = [
 
 export const SPEEDY_APPLIANCES = [...new Set(SPEEDY_RULES.map((r) => r.appliance))]
 
-// ─── Demo tracking data (labeled DEMO DATA everywhere it appears) ──────────
+// ─── Job tracking stages (production) ──────────────────────────────────────
+// Real job tracking lives in Top Speed Service OS and the Appliance Connect
+// portal. This page shows the stages a confirmed job moves through and hands
+// the customer off to those systems — it does not hold job records itself.
 
-export interface DemoJob {
-  code: string
-  service: string
-  city: string
-  stage: string
-  stages: string[]
-  note: string
-}
+export const TRACKING_STAGES = ['Request received', 'Setter confirmed', 'Technician assigned', 'On the way', 'Repair in progress', 'Done']
 
-export const DEMO_JOB: DemoJob = {
-  code: 'DEMO-1042',
-  service: 'Refrigerator Repair',
-  city: 'Coral Springs',
-  stage: 'Setter confirmed',
-  stages: ['Request received', 'Setter confirmed', 'Technician assigned', 'On the way', 'Repair in progress', 'Done'],
-  note: 'Demo timeline only. Real job tracking lives in Top Speed Service OS and the Appliance Connect portal — it is not connected to this page.',
-}
+// ─── Network stats (production — counters reset to zero at launch) ────────
 
-// ─── Demo network stats (labeled DEMO DATA everywhere it appears) ──────────
-
-export const DEMO_STATS = {
+export const NETWORK_STATS = {
   leadsByPage: [
-    { page: 'Refrigerator Repair (service page)', leads: 18 },
-    { page: 'Fort Lauderdale (city page)', leads: 14 },
-    { page: 'Dryer Repair (service page)', leads: 11 },
-    { page: 'Coral Springs (city page)', leads: 9 },
-    { page: 'Washer Repair (service page)', leads: 8 },
-    { page: 'Network Hub (home)', leads: 7 },
+    { page: 'Refrigerator Repair (service page)', leads: 0 },
+    { page: 'Fort Lauderdale (city page)', leads: 0 },
+    { page: 'Dryer Repair (service page)', leads: 0 },
+    { page: 'Coral Springs (city page)', leads: 0 },
+    { page: 'Washer Repair (service page)', leads: 0 },
+    { page: 'Network Hub (home)', leads: 0 },
   ],
-  note: 'Illustrative demo figures only — this page is not connected to Service OS analytics.',
+  note: 'Production counters — reset to zero at the production launch on November 17, 2026. Bookings themselves are recorded in Top Speed Service OS.',
 }

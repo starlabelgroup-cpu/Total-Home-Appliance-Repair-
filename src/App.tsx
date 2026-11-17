@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
-  CITIES, DEMO_JOB, DEMO_STATS, EMAIL, PHONE_DISPLAY, PHONE_SMS, PHONE_TEL,
+  CITIES, NETWORK_STATS, TRACKING_STAGES, EMAIL, PHONE_DISPLAY, PHONE_SMS, PHONE_TEL,
   SERVICES, SERVICE_OS_URL, SISTER_BRANDS, SPEEDY_APPLIANCES, SPEEDY_RULES,
 } from './data'
 import { Icon, Logo } from './icons'
@@ -286,7 +286,7 @@ function ServiceDetail({ id, go }: { id: string; go: (v: View) => void }) {
         <div className="wrap">
           <div className="notice notice-warn mt-lg">
             <Icon name="speedy" size={20} />
-            <p><strong>Not sure it’s the {s.name.replace(' Repair', '').toLowerCase()}?</strong> Try the Speedy guide for likely causes and safety notes first — it’s a local demo that points you in the right direction, not a diagnosis. And remember: pricing is confirmed when you book through Service OS.</p>
+            <p><strong>Not sure it’s the {s.name.replace(' Repair', '').toLowerCase()}?</strong> Try the Speedy guide for likely causes and safety notes first — it’s a local guide that points you in the right direction, not a diagnosis. And remember: pricing is confirmed when you book through Service OS.</p>
           </div>
           <div className="mt" style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
             <button className="btn btn-navy" onClick={() => go({ kind: 'speedy' })}><Icon name="speedy" size={17} /> Ask Speedy first</button>
@@ -528,7 +528,7 @@ function Speedy({ go }: { go: (v: View) => void }) {
     <>
       <div className="page-hero">
         <div className="wrap">
-          <span className="pill pill-demo">Local rule-based demo</span>
+          <span className="pill pill-demo">Local rule-based guide</span>
           <h1 style={{ marginTop: '0.7rem' }}>Speedy — the network guide</h1>
           <p>Pick an appliance and a symptom. Speedy matches it against a small set of built-in rules and shows likely causes, safety warnings and prep steps — then hands you off to book a real technician.</p>
         </div>
@@ -537,7 +537,7 @@ function Speedy({ go }: { go: (v: View) => void }) {
         <div className="wrap">
           <div className="notice notice-warn">
             <Icon name="alert" size={20} />
-            <p><strong>Honest labels, up front:</strong> Speedy here is a <strong>local rule-based demo</strong> running entirely in your browser. It is <strong>not a live AI</strong>, it is <strong>not connected</strong> to Service OS, and its answers are <strong>possibilities, not a professional diagnosis</strong>. Only a technician inspecting the appliance can diagnose it.</p>
+            <p><strong>Honest labels, up front:</strong> Speedy here is a <strong>local rule-based guide</strong> running entirely in your browser. It is <strong>not a live AI</strong>, it is <strong>not connected</strong> to Service OS, and its answers are <strong>possibilities, not a professional diagnosis</strong>. Only a technician inspecting the appliance can diagnose it.</p>
           </div>
 
           <div className="form-card mt-lg">
@@ -592,7 +592,7 @@ function Speedy({ go }: { go: (v: View) => void }) {
 /* ─── 6. Network HQ ───────────────────────────────────────────── */
 
 function HQ({ go }: { go: (v: View) => void }) {
-  const maxLeads = Math.max(...DEMO_STATS.leadsByPage.map((d) => d.leads))
+  const maxLeads = Math.max(1, ...NETWORK_STATS.leadsByPage.map((d) => d.leads))
   return (
     <>
       <div className="page-hero">
@@ -620,7 +620,7 @@ function HQ({ go }: { go: (v: View) => void }) {
                       <td><strong>{s.name}</strong></td>
                       <td>Service page</td>
                       <td>Service OS setters</td>
-                      <td><span className="pill pill-live">Live in this demo</span></td>
+                      <td><span className="pill pill-live">Live</span></td>
                       <td><button className="link" onClick={() => go({ kind: 'service', id: s.id })}>Open</button></td>
                     </tr>
                   ))}
@@ -640,7 +640,7 @@ function HQ({ go }: { go: (v: View) => void }) {
                       <td><strong>Appliance Repair in {c.name}</strong></td>
                       <td>{c.core ? 'Core city' : 'Network city'}</td>
                       <td>All 10 services</td>
-                      <td><span className="pill pill-live">Live in this demo</span></td>
+                      <td><span className="pill pill-live">Live</span></td>
                       <td><button className="link" onClick={() => go({ kind: 'city', id: c.id })}>Open</button></td>
                     </tr>
                   ))}
@@ -666,12 +666,12 @@ function HQ({ go }: { go: (v: View) => void }) {
 
           <div className="card" style={{ cursor: 'default' }}>
             <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
-              <h3 style={{ margin: 0 }}>Demo network stats</h3>
-              <span className="pill pill-demo">Demo data</span>
+              <h3 style={{ margin: 0 }}>Network stats — production</h3>
+              <span className="pill pill-live">Live · reset to zero Nov 17, 2026</span>
             </div>
-            <p style={{ marginTop: '0.4rem' }}>{DEMO_STATS.note}</p>
+            <p style={{ marginTop: '0.4rem' }}>{NETWORK_STATS.note}</p>
             <div className="stack mt">
-              {DEMO_STATS.leadsByPage.map((d) => (
+              {NETWORK_STATS.leadsByPage.map((d) => (
                 <div key={d.page} style={{ display: 'grid', gridTemplateColumns: 'minmax(150px, 1fr) 2fr 40px', gap: '0.8rem', alignItems: 'center', fontSize: '0.92rem' }}>
                   <span>{d.page}</span>
                   <span className="bar"><i style={{ width: `${(d.leads / maxLeads) * 100}%` }} /></span>
@@ -679,7 +679,7 @@ function HQ({ go }: { go: (v: View) => void }) {
                 </div>
               ))}
             </div>
-            <p style={{ color: 'var(--muted)', fontSize: '0.85rem', marginTop: '0.8rem' }}>“Leads by page” — illustrative only, to show how the network would report which fleet pages produce bookings once connected.</p>
+            <p style={{ color: 'var(--muted)', fontSize: '0.85rem', marginTop: '0.8rem' }}>“Leads by page” — every counter was reset to zero at the production launch. Jobs and leads are recorded in Service OS, the network’s system of record.</p>
           </div>
         </div>
       </section>
@@ -692,67 +692,54 @@ function HQ({ go }: { go: (v: View) => void }) {
 function Track({ go }: { go: (v: View) => void }) {
   const [code, setCode] = useState('')
   const [searched, setSearched] = useState(false)
-  const found = code.trim().toUpperCase() === DEMO_JOB.code
-  const currentIdx = DEMO_JOB.stages.indexOf(DEMO_JOB.stage)
 
   return (
     <>
       <div className="page-hero">
         <div className="wrap">
-          <span className="pill pill-demo">Demo data</span>
+          <span className="pill pill-live">Production</span>
           <h1 style={{ marginTop: '0.7rem' }}>Track a job</h1>
-          <p>A preview of how tracking feels. Real job tracking lives in Top Speed Service OS and the Appliance Connect portal — it is not connected to this page.</p>
+          <p>Live job tracking runs in Top Speed Service OS and the Appliance Connect customer portal — that is where your job record lives from confirmation to done. This page hands you straight to it.</p>
         </div>
       </div>
       <section className="block">
         <div className="wrap split">
           <form className="form-card" onSubmit={(e) => { e.preventDefault(); setSearched(true) }}>
-            <h2 style={{ color: 'var(--navy)', fontSize: '1.2rem' }}>Enter a job code</h2>
-            <p style={{ color: 'var(--muted)', fontSize: '0.92rem', margin: '0.3rem 0 1rem' }}>Try the demo code <strong>DEMO-1042</strong> to see the timeline.</p>
-            <label className="f">Job code<input value={code} onChange={(e) => { setCode(e.target.value); setSearched(false) }} placeholder="e.g. DEMO-1042" /></label>
-            <button className="btn btn-navy mt" type="submit"><Icon name="track" size={17} /> Look up</button>
-            {searched && !found && (
+            <h2 style={{ color: 'var(--navy)', fontSize: '1.2rem' }}>Have a job code?</h2>
+            <p style={{ color: 'var(--muted)', fontSize: '0.92rem', margin: '0.3rem 0 1rem' }}>Your code is on the confirmation from your setter. Job records are held in Service OS — enter your code there or in Appliance Connect to see live status.</p>
+            <label className="f">Job code<input value={code} onChange={(e) => { setCode(e.target.value); setSearched(false) }} placeholder="e.g. TS-XXXXXX" /></label>
+            <button className="btn btn-navy mt" type="submit"><Icon name="track" size={17} /> Continue to live tracking</button>
+            {searched && (
               <div className="notice notice-warn mt">
                 <Icon name="alert" size={20} />
-                <p><strong>Not found here — and it wouldn’t be.</strong> This demo only knows the code DEMO-1042. For a real job, track it in Service OS or Appliance Connect, or call {PHONE_DISPLAY}.</p>
+                <p><strong>Your job is tracked in Service OS, not on this page.</strong> Open Service OS or Appliance Connect below and enter your code there — or call {PHONE_DISPLAY} and a setter will update you.</p>
               </div>
             )}
+            <div className="mt" style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+              <a className="btn btn-navy btn-sm" href={SERVICE_OS_URL} target="_blank" rel="noreferrer">Open Service OS</a>
+              <a className="btn btn-outline btn-sm" href="https://appliance-connect.vercel.app" target="_blank" rel="noreferrer">Open Appliance Connect</a>
+            </div>
           </form>
           <div>
-            {found ? (
-              <div className="card" style={{ cursor: 'default' }}>
-                <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                  <h3 style={{ margin: 0 }}>{DEMO_JOB.code} — {DEMO_JOB.service}</h3>
-                  <span className="pill pill-demo">Demo data</span>
-                </div>
-                <p style={{ marginTop: '0.4rem' }}>{DEMO_JOB.city} · Current stage: <strong>{DEMO_JOB.stage}</strong></p>
-                <ul className="timeline">
-                  {DEMO_JOB.stages.map((st, i) => (
-                    <li key={st} className={i < currentIdx ? 'done' : i === currentIdx ? 'now' : ''}>
-                      <span className="dot">{i < currentIdx ? <Icon name="check" size={12} /> : null}</span>
-                      <span>
-                        <span className="t-name">{st}</span>
-                        <span className="t-note" style={{ display: 'block' }}>
-                          {i < currentIdx ? 'Completed (demo)' : i === currentIdx ? 'Where this demo job sits now' : 'Still ahead (demo)'}
-                        </span>
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-                <p style={{ color: 'var(--muted)', fontSize: '0.88rem' }}>{DEMO_JOB.note}</p>
+            <div className="card" style={{ cursor: 'default' }}>
+              <span className="ic"><Icon name="track" size={24} /></span>
+              <h3>The stages every confirmed job moves through</h3>
+              <ul className="timeline">
+                {TRACKING_STAGES.map((st) => (
+                  <li key={st}>
+                    <span className="dot"></span>
+                    <span>
+                      <span className="t-name">{st}</span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <p style={{ color: 'var(--muted)', fontSize: '0.88rem' }}>A human setter confirms every job before a technician is dispatched — no web form dispatches or charges on its own.</p>
+              <div className="mt" style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+                <button className="btn btn-outline btn-sm" onClick={() => go({ kind: 'book' })}>Book a repair</button>
+                <a className="btn btn-outline btn-sm" href={PHONE_TEL}>Call {PHONE_DISPLAY}</a>
               </div>
-            ) : (
-              <div className="card" style={{ cursor: 'default' }}>
-                <span className="ic"><Icon name="track" size={24} /></span>
-                <h3>Where real tracking lives</h3>
-                <p>Once a setter confirms your job in Service OS, its status — assigned, on the way, in progress, done — is tracked there and in the Appliance Connect customer portal.</p>
-                <div className="mt" style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
-                  <a className="btn btn-navy btn-sm" href={SERVICE_OS_URL} target="_blank" rel="noreferrer">Open Service OS</a>
-                  <a className="btn btn-outline btn-sm" href="https://appliance-connect.vercel.app" target="_blank" rel="noreferrer">Open Appliance Connect</a>
-                  <button className="btn btn-outline btn-sm" onClick={() => go({ kind: 'book' })}>Book a repair</button>
-                </div>
-              </div>
-            )}
+            </div>
           </div>
         </div>
       </section>
@@ -859,8 +846,8 @@ function Footer({ go }: { go: (v: View) => void }) {
           <h4>Network</h4>
           <ul>
             <li><button onClick={() => go({ kind: 'book' })}>Book a repair</button></li>
-            <li><button onClick={() => go({ kind: 'speedy' })}>Speedy guide (demo)</button></li>
-            <li><button onClick={() => go({ kind: 'track' })}>Track a job (demo)</button></li>
+            <li><button onClick={() => go({ kind: 'speedy' })}>Speedy guide</button></li>
+            <li><button onClick={() => go({ kind: 'track' })}>Track a job</button></li>
             <li><button onClick={() => go({ kind: 'hq' })}>Network HQ</button></li>
             {SISTER_BRANDS.slice(0, 3).map((b) => (
               <li key={b.name}><a href={b.url} target="_blank" rel="noreferrer">{b.name}</a></li>
@@ -870,7 +857,7 @@ function Footer({ go }: { go: (v: View) => void }) {
       </div>
       <div className="footer-base">
         Total Home Appliance Repair — the residential appliance repair network of Top Speed Appliance · Broward County, FL.
-        Pricing is confirmed when you book through Service OS. Demo content on this site is labeled as such.
+        Pricing is confirmed when you book through Service OS.
       </div>
     </footer>
   )
