@@ -10,6 +10,8 @@ export const SERVICE_OS_URL = 'https://topspeedserviceos.com'
 export const SERVICE_OS_BOOK_URL = 'https://topspeedserviceos.com/book'
 export const SERVICE_OS_SPEEDY_URL = 'https://topspeedserviceos.com/speedy'
 export const SERVICE_OS_TRACK_URL = 'https://topspeedserviceos.com/track'
+export const SERVICE_OS_SIGNIN_URL = 'https://topspeedserviceos.com/app'
+export const SERVICE_OS_RESET_URL = 'https://topspeedserviceos.com/reset-password'
 
 export interface Service {
   id: string

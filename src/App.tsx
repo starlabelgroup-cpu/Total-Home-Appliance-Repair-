@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   CITIES, NETWORK_STATS, TRACKING_STAGES, EMAIL, PHONE_DISPLAY, PHONE_SMS, PHONE_TEL,
   SERVICES, SERVICE_OS_URL, SERVICE_OS_BOOK_URL, SERVICE_OS_SPEEDY_URL, SERVICE_OS_TRACK_URL,
+  SERVICE_OS_SIGNIN_URL, SERVICE_OS_RESET_URL,
   SISTER_BRANDS, GUIDE_APPLIANCES, GUIDE_RULES,
 } from './data'
 import {
@@ -81,6 +82,7 @@ export default function App() {
             ))}
           </nav>
           <div className="header-cta">
+            <a className="btn btn-ghost btn-sm" href={SERVICE_OS_SIGNIN_URL} target="_blank" rel="noreferrer">Sign in</a>
             <a className="btn btn-ghost btn-sm" href={PHONE_TEL}><Icon name="phone" size={16} /> {PHONE_DISPLAY}</a>
             <button className="btn btn-orange btn-sm" onClick={() => go({ kind: 'book' })}>Book a Repair</button>
           </div>
@@ -92,6 +94,7 @@ export default function App() {
             </button>
           ))}
           <button onClick={() => go({ kind: 'book' })}>Book</button>
+          <a href={SERVICE_OS_SIGNIN_URL} target="_blank" rel="noreferrer">Sign in</a>
         </div>
       </header>
 
@@ -918,6 +921,8 @@ function Footer({ go }: { go: (v: View) => void }) {
             <li><button onClick={() => go({ kind: 'speedy' })}>Speedy</button></li>
             <li><button onClick={() => go({ kind: 'track' })}>Track a job</button></li>
             <li><button onClick={() => go({ kind: 'hq' })}>Network HQ</button></li>
+            <li><a href={SERVICE_OS_SIGNIN_URL} target="_blank" rel="noreferrer">Sign in</a></li>
+            <li><a href={SERVICE_OS_RESET_URL} target="_blank" rel="noreferrer">Forgot password</a></li>
             {SISTER_BRANDS.slice(0, 3).map((b) => (
               <li key={b.name}><a href={b.url} target="_blank" rel="noreferrer">{b.name}</a></li>
             ))}
