@@ -14,7 +14,9 @@
 //   source          'WEB_FORM' for this classic form (Speedy chat bookings
 //                   use 'SPEEDY_CHAT' — never claimed here)
 //   attribution     page / via / utmSource / utmMedium / utmCampaign /
-//                   gclid / fbclid / msclkid — all optional, additive
+//                   utmTerm / utmContent / gclid / fbclid / msclkid —
+//                   all optional, additive; first-touch persisted for
+//                   30 days (see firstTouchAttribution below)
 //
 // The 201 response carries data.referenceCode — the booking reference the
 // customer uses to track the job in Service OS. The response also carries
@@ -39,6 +41,8 @@ export interface Attribution {
   utmSource?: string
   utmMedium?: string
   utmCampaign?: string
+  utmTerm?: string
+  utmContent?: string
   gclid?: string
   fbclid?: string
   msclkid?: string
@@ -57,6 +61,8 @@ export function captureAttribution(search: string): Attribution {
     pick('utm_source', 'utmSource')
     pick('utm_medium', 'utmMedium')
     pick('utm_campaign', 'utmCampaign')
+    pick('utm_term', 'utmTerm')
+    pick('utm_content', 'utmContent')
     pick('gclid', 'gclid')
     pick('fbclid', 'fbclid')
     pick('msclkid', 'msclkid')
@@ -64,6 +70,52 @@ export function captureAttribution(search: string): Attribution {
     // An unparseable query string means no attribution — never an error.
   }
   return out
+}
+
+/* First-touch persistence (conversion tracking, 2026-11-20): the
+   Service OS convention — the FIRST tagged visit inside a 30-day
+   window owns the booking's attribution, so a later untagged (or
+   differently tagged) visit never overwrites the click that actually
+   brought the customer. Mirrors the flagship's tsos_attribution
+   capture. The stored values ride the booking payload into the
+   ServiceRequest record, where the offline-conversion export reads
+   the click IDs back out. Storage failures degrade to session-only
+   attribution — they never break a booking. */
+export const ATTRIBUTION_STORAGE_KEY = 'tha_attribution'
+const ATTRIBUTION_WINDOW_MS = 30 * 24 * 60 * 60 * 1000
+
+function readStoredAttribution(now: number): Attribution | null {
+  try {
+    if (typeof localStorage === 'undefined') return null
+    const raw = localStorage.getItem(ATTRIBUTION_STORAGE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as { capturedAt?: unknown; attribution?: Attribution } | null
+    if (!parsed || typeof parsed.capturedAt !== 'number' || !parsed.attribution) return null
+    if (now - parsed.capturedAt > ATTRIBUTION_WINDOW_MS) return null
+    return parsed.attribution
+  } catch {
+    return null
+  }
+}
+
+function storeAttribution(attribution: Attribution, now: number): void {
+  try {
+    if (typeof localStorage === 'undefined') return
+    localStorage.setItem(ATTRIBUTION_STORAGE_KEY, JSON.stringify({ capturedAt: now, attribution }))
+  } catch {
+    // Storage unavailable (private mode, quota) — session-only.
+  }
+}
+
+/** The attribution a booking should carry: the stored first touch when
+ *  one is still inside its 30-day window; otherwise the current URL's
+ *  parameters, which then become the stored first touch. */
+export function firstTouchAttribution(search: string, now: number = Date.now()): Attribution {
+  const stored = readStoredAttribution(now)
+  if (stored) return stored
+  const fresh = captureAttribution(search)
+  if (Object.keys(fresh).length > 0) storeAttribution(fresh, now)
+  return fresh
 }
 
 /** Client-side mirror of the intake contract. Returns the first problem
@@ -105,6 +157,8 @@ export function buildBookingPayload(
   if (attribution.utmSource) payload.utmSource = attribution.utmSource
   if (attribution.utmMedium) payload.utmMedium = attribution.utmMedium
   if (attribution.utmCampaign) payload.utmCampaign = attribution.utmCampaign
+  if (attribution.utmTerm) payload.utmTerm = attribution.utmTerm
+  if (attribution.utmContent) payload.utmContent = attribution.utmContent
   if (attribution.gclid) payload.gclid = attribution.gclid
   if (attribution.fbclid) payload.fbclid = attribution.fbclid
   if (attribution.msclkid) payload.msclkid = attribution.msclkid
@@ -147,6 +201,16 @@ export async function submitBooking(payload: Record<string, unknown>): Promise<B
       reference_code: body.data.referenceCode,
       via: payload.via,
     })
+  }
+  // Tag-manager dataLayer event (conversion tracking, 2026-11-20): the
+  // same booking_submitted signal the flagship surfaces push, so any
+  // tag container Ramone connects later sees one consistent event.
+  try {
+    const w = window as any
+    w.dataLayer = w.dataLayer || []
+    w.dataLayer.push({ event: 'booking_submitted', reference_code: body.data.referenceCode, via: payload.via })
+  } catch {
+    // Measurement must never break a booking.
   }
   return body.data
 }

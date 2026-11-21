@@ -6,9 +6,10 @@ import {
   SISTER_BRANDS, GUIDE_APPLIANCES, GUIDE_RULES,
 } from './data'
 import {
-  buildBookingPayload, captureAttribution, submitBooking, validateBookingForm,
+  buildBookingPayload, firstTouchAttribution, submitBooking, validateBookingForm,
   type BookingResult,
 } from './booking'
+import { fireGoogleAdsConversion, initGoogleAdsTag } from './googleAds'
 import { Icon, Logo } from './icons'
 
 type View =
@@ -48,6 +49,16 @@ export default function App() {
   useEffect(() => {
     window.scrollTo({ top: 0 })
   }, [view])
+
+  // Conversion tracking (2026-11-20): hold the landing page's first
+  // touch (ad click IDs + UTMs, 30-day window) from the moment the
+  // visitor arrives — not just when the form is submitted — and load
+  // the Google Ads tag if its config slot has been filled in
+  // src/adsConfig.ts (inert while unset).
+  useEffect(() => {
+    firstTouchAttribution(window.location.search)
+    initGoogleAdsTag()
+  }, [])
 
   const navOn = (k: View['kind']) =>
     view.kind === k || (k === 'services' && view.kind === 'service') || (k === 'cities' && view.kind === 'city')
@@ -421,7 +432,7 @@ function Book({ serviceId, cityId, go }: { serviceId?: string; cityId?: string; 
     }
     const payload = buildBookingPayload(
       form,
-      captureAttribution(window.location.search),
+      firstTouchAttribution(window.location.search),
       window.location.href.split('#')[0],
     )
     if (!payload) {
@@ -431,6 +442,10 @@ function Book({ serviceId, cityId, go }: { serviceId?: string; cityId?: string; 
     setPhase({ kind: 'sending' })
     try {
       const result = await submitBooking(payload)
+      // Google Ads conversion (inert until the AW- ID/label are pasted
+      // into src/adsConfig.ts); the booking reference is the
+      // transaction ID so the conversion reconciles with the record.
+      fireGoogleAdsConversion(result.referenceCode)
       setPhase({ kind: 'done', result })
     } catch (err) {
       setPhase({
