@@ -122,6 +122,10 @@ export default function App() {
         {view.kind === 'about' && <About go={go} />}
       </main>
 
+      <div style={{ maxWidth: 880, margin: '24px auto', padding: '0 16px' }}>
+        <div data-ts-ad data-slot="content" data-platform="totalhome"></div>
+      </div>
+
       <Footer go={go} />
     </>
   )
